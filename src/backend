@@ -1,0 +1,113 @@
+const express = require('express');
+const cors = require('cors'); // Required for cross-origin requests from frontend
+
+const app = express();
+const PORT = process.env.PORT || 5000; // Backend will run on port 5000 by default
+
+// --- Middleware ---
+// Enable CORS for all routes and origins during development.
+// In production, you might want to restrict this to your frontend's domain.
+app.use(cors());
+// Parse JSON request bodies. This is crucial for handling data sent from the frontend.
+app.use(express.json());
+
+// --- In-memory "Database" for Todos ---
+// This array will hold our todo items. Data will reset on server restart.
+let todos = [
+    { id: 1, text: 'Learn React hooks', completed: false, createdAt: new Date() },
+    { id: 2, text: 'Build a fullstack application', completed: true, createdAt: new Date() },
+    { id: 3, text: 'Deploy to Vercel/Netlify', completed: false, createdAt: new Date() }
+];
+let nextId = 4; // To assign unique IDs to new todos
+
+// --- API Routes ---
+
+// GET /api/todos: Retrieve all todos
+app.get('/api/todos', (req, res) => {
+    console.log('GET /api/todos requested');
+    // Send the entire todos array as a JSON response
+    res.json(todos);
+});
+
+// GET /api/todos/:id: Retrieve a single todo by its ID
+app.get('/api/todos/:id', (req, res) => {
+    const id = parseInt(req.params.id); // Convert the ID from URL parameter to integer
+    const todo = todos.find(t => t.id === id); // Find the todo in the array
+
+    if (todo) {
+        // If todo is found, send it as JSON
+        res.json(todo);
+    } else {
+        // If not found, send a 404 Not Found status with a message
+        res.status(404).json({ message: 'Todo not found' });
+    }
+});
+
+// POST /api/todos: Create a new todo
+app.post('/api/todos', (req, res) => {
+    const { text } = req.body; // Extract 'text' from the request body
+
+    // Basic validation: Check if text is provided and not empty
+    if (!text || typeof text !== 'string' || text.trim() === '') {
+        return res.status(400).json({ message: 'Todo text is required and cannot be empty' });
+    }
+
+    // Create a new todo object with a unique ID and current timestamp
+    const newTodo = {
+        id: nextId++,
+        text: text.trim(), // Trim whitespace from the text
+        completed: false, // New todos are initially not completed
+        createdAt: new Date()
+    };
+    todos.push(newTodo); // Add the new todo to our in-memory array
+
+    console.log('POST /api/todos - Added:', newTodo);
+    res.status(201).json(newTodo); // Send 201 Created status and the newly created todo
+});
+
+// PUT /api/todos/:id: Update an existing todo by its ID
+app.put('/api/todos/:id', (req, res) => {
+    const id = parseInt(req.params.id); // Get todo ID from URL
+    const { text, completed } = req.body; // Get text and completed status from request body
+
+    const todoIndex = todos.findIndex(t => t.id === id); // Find the index of the todo
+
+    if (todoIndex === -1) {
+        return res.status(404).json({ message: 'Todo not found' });
+    }
+
+    // Update properties if they are provided in the request body
+    if (text !== undefined && typeof text === 'string') {
+        todos[todoIndex].text = text.trim();
+    }
+    if (completed !== undefined && typeof completed === 'boolean') {
+        todos[todoIndex].completed = completed;
+    }
+
+    console.log('PUT /api/todos/:id - Updated:', todos[todoIndex]);
+    res.json(todos[todoIndex]); // Send the updated todo
+});
+
+// DELETE /api/todos/:id: Delete a todo by its ID
+app.delete('/api/todos/:id', (req, res) => {
+    const id = parseInt(req.params.id); // Get todo ID from URL
+    const initialLength = todos.length; // Store initial array length to check if deletion occurred
+    todos = todos.filter(t => t.id !== id); // Filter out the todo to be deleted
+
+    if (todos.length < initialLength) {
+        console.log('DELETE /api/todos/:id - Deleted ID:', id);
+        res.status(204).send(); // 204 No Content - indicates successful deletion with no body
+    } else {
+        res.status(404).json({ message: 'Todo not found' }); // Todo not found if length didn't change
+    }
+});
+
+// Basic root route for the API
+app.get('/', (req, res) => {
+    res.send('Todo Backend API is running!');
+});
+
+// --- Start the Server ---
+app.listen(PORT, () => {
+    console.log(`Backend server running on http://localhost:${PORT}`);
+});

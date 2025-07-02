@@ -1,0 +1,103 @@
+import React, { useState, useEffect } from 'react';
+import axios from './axios'; // Your custom axios instance
+import TodoForm from './TodoForm';
+import { formatDate } from './formatDate'; // Import the utility function
+import './App.css';
+
+function App() {
+  const [todos, setTodos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch todos from the backend
+  useEffect(() => {
+    const fetchTodos = async () => {
+      try {
+        const response = await axios.get('/todos'); // Using the custom axios instance
+        setTodos(response.data);
+      } catch (err) {
+        console.error('Error fetching todos:', err);
+        setError('Failed to load todos. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTodos();
+  }, []); // Empty dependency array means this runs once on mount
+
+  // Add a new todo
+  const addTodo = async (text) => {
+    try {
+      const response = await axios.post('/todos', { text });
+      setTodos((prevTodos) => [...prevTodos, response.data]);
+    } catch (err) {
+      console.error('Error adding todo:', err);
+      setError('Failed to add todo. Please try again.');
+    }
+  };
+
+  // Toggle todo completion status
+  const toggleTodo = async (id) => {
+    const todoToToggle = todos.find(todo => todo.id === id);
+    if (!todoToToggle) return;
+
+    try {
+      const updatedTodo = { ...todoToToggle, completed: !todoToToggle.completed };
+      await axios.put(`/todos/${id}`, { completed: updatedTodo.completed });
+      setTodos((prevTodos) =>
+        prevTodos.map((todo) => (todo.id === id ? updatedTodo : todo))
+      );
+    } catch (err) {
+      console.error('Error toggling todo:', err);
+      setError('Failed to update todo status.');
+    }
+  };
+
+  // Delete a todo
+  const deleteTodo = async (id) => {
+    try {
+      await axios.delete(`/todos/${id}`);
+      setTodos((prevTodos) => prevTodos.filter((todo) => todo.id !== id));
+    } catch (err) {
+      console.error('Error deleting todo:', err);
+      setError('Failed to delete todo.');
+    }
+  };
+
+  if (loading) {
+    return <div className="app-container">Loading todos...</div>;
+  }
+
+  if (error) {
+    return <div className="app-container error-message">{error}</div>;
+  }
+
+  return (
+    <div className="app-container">
+      <h1>My Todo List</h1>
+      <TodoForm onAddTodo={addTodo} />
+      {todos.length === 0 ? (
+        <p className="no-todos-message">No todos yet! Add one above.</p>
+      ) : (
+        <ul className="todo-list">
+          {todos.map((todo) => (
+            <li key={todo.id} className={`todo-item ${todo.completed ? 'completed' : ''}`}>
+              <span onClick={() => toggleTodo(todo.id)} className="todo-text">
+                {todo.text}
+              </span>
+              <div className="todo-actions">
+                <span className="todo-date">{formatDate(todo.createdAt)}</span>
+                <button onClick={() => deleteTodo(todo.id)} className="delete-button">
+                  Delete
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+export default App;
